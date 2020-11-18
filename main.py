@@ -43,8 +43,8 @@ async def get_urls():
 
 @app.get("/{url_hash}")
 async def redirect(url_hash: str):
-    url = r.get("url:"+url_hash).decode("utf-8")
+    url = r.get("url:"+url_hash)
     if(url):
-        return RedirectResponse(url=url)
+        return RedirectResponse(url=url).decode("utf-8")
     else:
         return {"status": 0, "message": "Url not found"}
