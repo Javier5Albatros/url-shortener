@@ -1,12 +1,13 @@
 from typing import Optional
 from fastapi import FastAPI
 from starlette.responses import RedirectResponse
-import short_url
+import hashlib
 import redis
 import re
+import shortuuid
 
 app = FastAPI()
-r = redis.Redis(host="localhost", port=6379, db=0)
+r = redis.Redis(host="54.37.224.17", port=6379, db=0)
 
 url_regex = re.compile(
     r'^(?:http|ftp)s?://'  # http:// or https://
@@ -23,7 +24,7 @@ async def save_url(url: str):
     if(not re.match(url_regex, url)):
         return {"status": 0, "message": "Malformed url"}
     else:
-        url_hashed = str(url.__hash__())
+        url_hashed = shortuuid.uuid(name=url, pad_length=10)
         if(r.get("url:" + url_hashed)):
             return {"status": 0, "message": "Url already registered"}
         else:
@@ -41,8 +42,8 @@ async def get_urls():
 
 
 @app.get("/{url_hash}")
-async def redirect(url_hash: int):
-    url = r.get("url:"+str(url_hash)).decode("utf-8")
+async def redirect(url_hash: str):
+    url = r.get("url:"+url_hash).decode("utf-8")
     if(url):
         return RedirectResponse(url=url)
     else:
