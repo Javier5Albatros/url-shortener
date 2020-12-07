@@ -1,38 +1,61 @@
 from typing import Optional
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException, status
 from pydantic import BaseModel, ValidationError, validator
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from starlette.responses import RedirectResponse
-import hashlib
+from models import User, Url
 import redis
-import re
+from pymongo import MongoClient
 import shortuuid
+from auth import hash_password, get_current_user, check_password, get_user
 
 app = FastAPI()
-r = redis.Redis(host="54.37.224.17", port=6379, db=0)
-
-url_regex = re.compile(
-    r'^(?:http|ftp)s?://'  # http:// or https://
-    # domain...
-    r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'
-    r'localhost|'  # localhost...
-    r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
-    r'(?::\d+)?'  # optional port
-    r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+r = redis.Redis(host="localhost", port=6379, db=0)
+client = MongoClient()
+mongodb = client['url_shortener']
 
 
-class Url(BaseModel):
-    url: str
-    url_hash: str
+@app.post('/users')
+async def register(user: User):
+    if mongodb.users.find_one({"username": user.username}):
+        return {"status": 0, "error": "username already exists"}
+    password = hash_password(user.password)
+    user = user.dict()
+    user['password'] = password
+    user = User(**user)
+    ret = mongodb.users.insert_one(user.dict(by_alias=True))
+    return {"status": 1, "msg": "User succesfully registered", "username": user.username, "id": str(ret.inserted_id)}
 
-    @validator('url', pre=True)
-    def is_url(cls, v):
-        if(not re.match(url_regex, v)):
-            raise ValueError('Malformed URL: '+v)
-        return v
+@app.get('/users')
+async def get_users(user: User = Depends(get_current_user)):
+    users = []
+    for user in mongodb.users.find():
+        user = User(**user)
+        delattr(user, 'password')
+        users.append(user)
+    return {'users': users}
+
+@app.post("/token")
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user_dict = get_user(form_data.username)
+    if not user_dict:
+        raise HTTPException(
+            status_code=400, detail="Wrong username")
+    user = user_dict
+    hashed_password = user_dict.password
+    if not check_password(form_data.password, hashed_password):
+        raise HTTPException(
+            status_code=400, detail="Wrong password")
+    return {"access_token": user.username, "token-type": "bearer"}
+
+
+@app.get("/users/me")
+async def read_users_me(current_user: User = Depends(get_current_user)):
+    return current_user
 
 
 @app.put("/url")
-async def save_url(url: str):
+async def save_url(url: str, user: User = Depends(get_current_user)):
     try:
         url = Url(
             url=url,
@@ -45,7 +68,7 @@ async def save_url(url: str):
 
 
 @app.get("/urls")
-async def get_urls():
+async def get_urls(user: User = Depends(get_current_user)):
     urls = {}
     keys = r.keys("*url:*")
     if(not keys):
