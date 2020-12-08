@@ -1,3 +1,5 @@
+bcrypt
+pymongo
 click==7.1.2
 fastapi==0.61.2
 h11==0.11.0
