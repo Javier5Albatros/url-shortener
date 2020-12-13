@@ -41,6 +41,6 @@ async def get_urls(user: User = Depends(get_current_user)):
 async def redirect(url_hash: str, user: User = Depends(get_current_user)):
     url = mongo.urls.find_one({"url_hash": url_hash})
     if url:
-        return RedirectResponse(url=url.decode("utf-8"))
+        return RedirectResponse(url=url["url"])
     else:
         return {"status": 0, "message": "Url not found"}
