@@ -7,7 +7,7 @@ class Url(BaseModel):
     url_hash: str
 
     @validator('url', pre=True)
-    def is_url(self, v):
+    def is_url(cls, v):
         if not re.match(url_regex, v):
             raise ValueError('Malformed URL: ' + v)
         return v

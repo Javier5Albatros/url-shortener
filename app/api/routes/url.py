@@ -5,8 +5,8 @@ from fastapi import APIRouter
 from starlette.responses import RedirectResponse
 from app.models.url import Url
 from app.models.user import User
-from app.auth import get_current_user
-from app.main import r
+from app.services.auth import get_current_user
+from app.db.redis import r
 
 
 router = APIRouter()
@@ -49,7 +49,7 @@ async def get_urls(user: User = Depends(get_current_user)):
 
 
 @router.get("/{url_hash}")
-async def redirect(url_hash: str):
+async def redirect(url_hash: str, user: User = Depends(get_current_user)):
     url = r.get("url:"+url_hash)
     if url:
         return RedirectResponse(url=url.decode("utf-8"))
