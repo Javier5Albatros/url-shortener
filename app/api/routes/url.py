@@ -34,12 +34,10 @@ async def get_urls(user: User = Depends(get_current_user)):
     i = 0
     if user.username == "root":
         for url in mongo.urls.find():
-            print(url)
             urls[i] = {
                 "url": url["url"],
                 "url_hash": url["url_hash"],
                 "user": url["user"]
-
             }
             i += 1
     else:
