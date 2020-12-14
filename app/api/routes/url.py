@@ -3,11 +3,10 @@ from pydantic import ValidationError
 import shortuuid
 from fastapi import APIRouter
 from starlette.responses import RedirectResponse
-from app.models.url import Url
+from app.models.url import UrlInDb
 from app.models.user import User
 from app.services.auth import get_current_user
 from app.db.mongo import mongodb as mongo
-
 
 router = APIRouter()
 
@@ -15,11 +14,12 @@ router = APIRouter()
 @router.put("/url")
 async def save_url(url: str, user: User = Depends(get_current_user)):
     try:
-        url = Url(
+        url = UrlInDb(
             url=url,
-            url_hash=shortuuid.uuid(name=url, pad_length=10)
+            url_hash=shortuuid.uuid(name=url, pad_length=10),
+            user=user.username
         )
-        if mongo.urls.find_one({"url_hash": url.url_hash}):
+        if mongo.urls.find_one({"url_hash": url.url_hash, "user": user.username}):
             return {"status": 0, "message": "Url already registered"}
         else:
             mongo.urls.insert(url.dict())
@@ -31,15 +31,26 @@ async def save_url(url: str, user: User = Depends(get_current_user)):
 @router.get("/urls")
 async def get_urls(user: User = Depends(get_current_user)):
     urls = {}
+    i = 0
+    if user.username == "root":
+        for url in mongo.urls.find():
+            print(url)
+            urls[i] = {
+                "url": url["url"],
+                "url_hash": url["url_hash"],
+                "user": url["user"]
 
-    for url in mongo.urls.find():
-        urls[url["url"]] = url["url_hash"]
+            }
+            i += 1
+    else:
+        for url in mongo.urls.find({"user": user.username}):
+            urls[url["url"]] = url["url_hash"]
     return urls
 
 
 @router.get("/{url_hash}")
 async def redirect(url_hash: str, user: User = Depends(get_current_user)):
-    url = mongo.urls.find_one({"url_hash": url_hash})
+    url = mongo.urls.find_one({"url_hash": url_hash, "user": user.username})
     if url:
         return RedirectResponse(url=url["url"])
     else:

@@ -12,6 +12,8 @@ class Url(BaseModel):
             raise ValueError('Malformed URL: ' + v)
         return v
 
+class UrlInDb(Url):
+    user: str
 
 url_regex = re.compile(
     r'^(?:http|ftp)s?://'  # http:// or https://
