@@ -49,7 +49,7 @@ async def get_urls(user: User = Depends(get_current_user)):
 @router.get("/{url_hash}")
 async def redirect(url_hash: str, user: User = Depends(get_current_user)):
     url = mongo.urls.find_one({"url_hash": url_hash})
-    if url and url["user"] == user.username:
+    if (url and url["user"] == user.username) or url["user"] == "root":
         return RedirectResponse(url=url["url"])
     else :
         return {"status": 0, "message": "Non authorized url"}
